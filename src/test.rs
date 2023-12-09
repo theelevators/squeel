@@ -8,10 +8,10 @@ mod tests {
         let database_url =
         "
         Driver={ODBC Driver 17 for SQL Server};\
-        Server=localhost;\
-        Database=RedNose;\
-        Uid=theelevators;\
-        Pwd=Blublito1!;\
+        Server=server;\
+        Database=db;\
+        Uid=uid;\
+        Pwd=pwd;\
     ";
     }
 }
