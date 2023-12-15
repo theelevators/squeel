@@ -1,6 +1,6 @@
-pub mod test;
 extern crate odbc;
 extern crate r2d2;
+
 use anyhow::Error;
 use odbc::odbc_safe::AutocommitOn;
 use odbc::ResultSetState::{Data, NoData};
@@ -12,29 +12,37 @@ pub type SQLPool = Pool<ODBCConnectionManager>;
 pub type SQLPooledConnection = PooledConnection<ODBCConnectionManager>;
 pub type SQLConnection<'a> = Connection<'a, AutocommitOn>;
 
+
 pub enum DatabaseResponse {
     Results(String),
     Message(String),
 }
 
-pub fn establish_connection(odbc_string: &str) -> Result<SQLPool, Error> {
-    return Ok(init_pool(odbc_string)?);
+pub fn establish_connection(odbc_conn: &str) -> Result<SQLPool, Error> {
+    return Ok(init_pool(odbc_conn)?);
 }
 
-pub fn init_pool(odbc_string: &str) -> Result<SQLPool, r2d2::Error> {
-    return Pool::builder().build(ODBCConnectionManager::new(odbc_string));
+pub fn init_pool(odbc_conn: &str) -> Result<SQLPool, r2d2::Error> {
+    return Pool::builder().build(ODBCConnectionManager::new(odbc_conn));
 }
 pub fn sql_pool_handler(pool: &SQLPool) -> Result<SQLPooledConnection, Error> {
-    let _pool = pool.get().unwrap();
-    Ok(_pool)
+    return Ok(pool.get()?)
 }
 pub struct Query<'a> {
-    cmd: &'a str,
-    params: Option<Vec<&'a str>>,
+   pub cmd: &'a str,
+   pub params: Option<Vec<&'a str>>,
 }
 
 impl Query<'_> {
-    pub fn exec<'env>(&mut self, conn: &SQLConnection<'env>) -> Result<DatabaseResponse, Error> {
+    pub fn new(cmd: &str)->Query{
+        Query{cmd, params:None}
+    }
+
+    pub fn new_parametized<'a>(cmd:&'a str, params:Vec<&'a str>)->Query<'a>{
+        Query{cmd, params:Some(params)}
+    }
+
+    pub fn execute<'env>(&mut self, conn: &SQLConnection<'env>) -> Result<DatabaseResponse, Error> {
         let mut stmt = Statement::with_parent(conn)?;
         let mut results: Vec<_> = vec![];
         match self.params.take() {
