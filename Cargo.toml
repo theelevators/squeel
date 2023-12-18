@@ -11,3 +11,6 @@ odbc-api = "0.57.0"
 r2d2 = "0.8.10"
 anyhow = "1.0.71"
 r2d2_odbc = "0.5.0"
+squeel-derive = {path = "squeel-derive"}
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = "1.0.88"
