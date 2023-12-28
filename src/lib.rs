@@ -1,13 +1,15 @@
 extern crate odbc;
 extern crate r2d2;
 
+pub mod dml;
+pub mod objects;
 use anyhow::Error;
+use objects::Entity;
 use odbc::odbc_safe::AutocommitOn;
 use odbc::Connection;
-use odbc::ResultSetState::{Data, NoData};
 use r2d2::{Pool, PooledConnection};
 use r2d2_odbc::ODBCConnectionManager;
-use serde::de::DeserializeOwned;
+use odbc::ResultSetState::{Data, NoData};
 
 pub type SQLPool = Pool<ODBCConnectionManager>;
 pub type SQLPooledConnection = PooledConnection<ODBCConnectionManager>;
@@ -23,15 +25,7 @@ pub fn init_pool(odbc_conn: &str) -> Result<SQLPool, r2d2::Error> {
 pub fn sql_pool_handler(pool: &SQLPool) -> Result<SQLPooledConnection, Error> {
     return Ok(pool.get()?);
 }
-pub trait Entity
-where
-    Self: Sized + DeserializeOwned,
-{
-    fn as_table() -> String;
-    fn find<'a>() -> Statement<'a, String> {
-        Statement::new(Self::as_table())
-    }
-}
+
 
 pub enum DatabaseResponse {
     Results(String),
@@ -137,4 +131,3 @@ impl<S: std::convert::AsRef<str>> Statement<'_, S> {
         }
     }
 }
-

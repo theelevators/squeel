@@ -37,9 +37,9 @@ fn data_types_derive_macro2(
 
         impl #impl_generic Entity for #ident #type_generics #where_clause {
 
-            fn as_table() -> String {
+            fn as_table() -> (String,String) {
                 let fields = [#(#fields),*].join(",");
-                format!("SELECT {} FROM {} FOR JSON PATH;",fields,#ident_str)
+                (fields,#ident_str.to_string())
             }
         }
     ));
