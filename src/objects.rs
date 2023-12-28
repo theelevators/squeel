@@ -3,34 +3,31 @@ use crate::{Statement, dml::{Command, Query}};
 
 pub type Columns<'a> = Vec<&'a str>;
 
+pub enum Object {
+    Table(String),
+    Join(String)
+}
 
 
 pub trait Entity: serde::de::DeserializeOwned
 {
-    fn as_table() -> (String, String);
-    fn to_query() -> String {
-        let (cols, table) = Self::as_table();
-         Query::new(Command::SELECT, cols.as_str(), table.as_str()).build()
+
+    fn as_join(cols:Columns )->Object{
+        let (_, table) = Self::table_column();
+        todo!("implement join")
+        
+    }
+
+    fn table()->Object{
+        let (_, table) = Self::table_column();
+        return Object::Table(table);
+    }
+    fn table_column() -> (String, String);
+    fn query<'a>() -> Query<'a, String, String, String> {
+        let (cols, table) = Self::table_column();
+         Query::new(Command::SELECT, cols, table)
     }
     fn find<'a>() -> Statement<'a, String> {
-        Statement::new(Self::to_query())
+        Statement::new(Self::query().build())
     }
 }
-
-
-// pub struct IncompleteJoin<T: Entity>{
-//     from_table: T,
-//     from_columns: String
-
-// }
-
-// pub struct CompleteJoin<'a, F:Entity, T:Entity>{
-//     from_table: F,
-//     to_table:T,
-//     on: Columns<'a>
-// }
-
-// pub struct On<'a> {
-//     left_columns: Columns<'a>,
-//     right_columns: Columns<'a>
-// }
