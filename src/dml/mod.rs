@@ -1,5 +1,7 @@
+use serde::de::DeserializeOwned;
+
 use crate::{
-    objects::{Cols, Entity, Table},
+    objects::{Cols,Table},
     SQLPool, Statement,
 };
 
@@ -39,7 +41,9 @@ impl Query {
         }
     }
 
-    pub fn all<E: Entity>(self, dbpool: &SQLPool) -> Result<Vec<E>, anyhow::Error> {
+    pub fn all<E: DeserializeOwned >(self, dbpool: &SQLPool) -> Result<Vec<E>, anyhow::Error> {
+
+        println!("{}", self.clone().build());
         Statement::new(self.build()).all(dbpool)
     }
 

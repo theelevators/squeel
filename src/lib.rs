@@ -4,12 +4,12 @@ extern crate r2d2;
 pub mod dml;
 pub mod objects;
 use anyhow::Error;
-use objects::Entity;
 use odbc::odbc_safe::AutocommitOn;
 use odbc::Connection;
 use r2d2::{Pool, PooledConnection};
 use r2d2_odbc::ODBCConnectionManager;
 use odbc::ResultSetState::{Data, NoData};
+use serde::de::DeserializeOwned;
 
 pub type SQLPool = Pool<ODBCConnectionManager>;
 pub type SQLPooledConnection = PooledConnection<ODBCConnectionManager>;
@@ -59,7 +59,7 @@ impl<S: std::convert::AsRef<str>> Statement<'_, S> {
         }
     }
 
-    pub fn all<T: Entity>(mut self,dbpool: &SQLPool) -> Result<Vec<T>, Error> {
+    pub fn all<T: DeserializeOwned>(mut self,dbpool: &SQLPool) -> Result<Vec<T>, Error> {
         match self.fetch(dbpool) {
             DatabaseResponse::Results(results) => Ok(serde_json::from_str(&results).unwrap()),
             DatabaseResponse::Message(msg) => panic!("{}", msg),

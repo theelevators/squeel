@@ -64,7 +64,7 @@ impl Join {
                     .collect::<Vec<_>>()
                     .join("");
 
-                format!("JOIN {l_tbl} {on}")
+                format!("JOIN {r_tbl} {on}")
             }
             JoinState::Incomplete => {
                 panic!("Cannot build an incomplete join.")
