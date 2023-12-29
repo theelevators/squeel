@@ -1,136 +1,175 @@
-use crate::{objects::{Object, Entity}, Statement, SQLPool};
+use crate::{
+    objects::{Cols, Entity, Table},
+    SQLPool, Statement,
+};
 
-use self::complex::Join;
+use self::complex::{Join, JoinState};
 
 pub mod complex;
 pub mod simple;
 
-#[derive(Clone)]
+#[derive(Debug,Clone)]
 pub enum Command {
     SELECT,
     INSERT,
     DELETE,
-    UPDATE
+    UPDATE,
 }
 
-#[derive(Clone)]
-pub struct Query<'a,C: AsRef<str>,T: AsRef<str>, J: AsRef<str> > where C: Clone, T: Clone {
+#[derive(Debug,Clone)]
+pub struct Query
+{
     cmd: Command,
-    cols: C,
+    cols: Cols,
     limit: Option<i64>,
-    from: T,
-    conditon: Option<&'a str>,
-    join: Option<J>,
+    from: Table,
+    conditon: Option<String>,
+    join: Option<Join>,
 }
 
-impl<C: AsRef<str> + Clone,T: AsRef<str>+ Clone, J: AsRef<str>+ Clone>  Query<'_, C, T, J>  {
-    pub fn new<'a>(cmd:Command, cols:C, from_table:T)->Query<'a, C, T,J>{
-        Query { cmd, cols, limit:None,from: from_table, conditon: None, join: None }
+impl Query {
+    pub fn new(cmd: Command, cols: Cols, from_table: Table) -> Query {
+        Query {
+            cmd,
+            cols,
+            limit: None,
+            from: from_table,
+            conditon: None,
+            join: None,
+        }
     }
 
-    pub fn run<E: Entity>(self,dbpool: &SQLPool)->Result<Vec<E>, anyhow::Error>{
+    pub fn run<E: Entity>(self, dbpool: &SQLPool) -> Result<Vec<E>, anyhow::Error> {
         Statement::new(self.build()).all(dbpool)
+    }
 
+    pub fn limit(mut self, limit:i64)->Query{
+        self.limit = Some(limit);
+        self
     }
     
-    pub fn join(&mut self, table:Object)->Join<'_, C, T,J,String,>{
-
-        let to_table = match table {
-            Object::Table(table) => table,
-            _ => panic!("Invalid Object")
-        };        
-        
-        let join = 
-
-        Join{
-            query:self.clone(),
-            to_table
-        };
-
-        join
+    pub fn join(mut self, join: Join) -> Query {
+        self.join = Some(join);
+        let mut join = self.join.expect("No join has been provided");
+        join.state = JoinState::Complete;
+        self.join = Some(join);
+        self
     }
 
 
-    pub fn build(self)->String{
 
+    pub fn on(mut self, cols: Cols) -> Query {
+        let mut join = self.join.take().expect("No join has been provided");
+
+        if join.l_tbl.is_none() & join.r_tbl.is_none() {
+            panic!("No tables have been provided");
+        }
+
+        if  join.l_tbl.is_none() & join.r_tbl.is_some(){
+            join.l_tbl = Some(self.from.clone());
+
+        }else if join.r_tbl.is_none() & join.l_tbl.is_some(){
+            join.r_tbl = Some(self.from.clone());
+
+        }
+
+        if  join.l_col.is_none() & join.r_col.is_some(){
+            join.l_col = Some(cols);
+
+        }else if join.r_col.is_none() & join.l_col.is_some(){
+            join.r_col = Some(cols);
+
+        }
+        self.join = Some(join);
+        self
+    }
+
+    pub fn build(self) -> String {
         match self.cmd {
             Command::SELECT => {
-
                 match self.limit {
                     Some(limit) => {
                         match self.conditon {
-                            Some(condition)=>{
-
+                            Some(condition) => {
                                 match self.join {
                                     Some(join) => {
-                                        format!("SELECT TOP {} {} FROM {} JOIN {} WHERE {} FOR JSON PATH;",limit,self.cols.as_ref(), self.from.as_ref(), join.as_ref(),condition)
+                                        format!("SELECT TOP {} {} FROM {} {} WHERE {} FOR JSON PATH;",limit,self.cols.join(", "), &self.from.name, join.build(),condition)
                                     }
-                                    None =>{
-                                        format!("SELECT TOP {} {} FROM {} WHERE {} FOR JSON PATH;",limit,self.cols.as_ref(), self.from.as_ref(),condition)
-
+                                    None => {
+                                        format!(
+                                            "SELECT TOP {} {} FROM {} WHERE {} FOR JSON PATH;",
+                                            limit,
+                                            self.cols.join(", "),
+                                            &self.from.name,
+                                            condition
+                                        )
                                     }
                                 }
+                            }
+                            None => match self.join {
+                                Some(join) => {
+                                    format!(
+                                        "SELECT TOP {} {} FROM {} {} FOR JSON PATH;",
+                                        limit,
+                                        self.cols.join(", "),
+                                        &self.from.name,
+                                        join.build()
+                                    )
+                                }
+                                None => {
+                                    format!(
+                                        "SELECT TOP {} {} FROM {} FOR JSON PATH;",
+                                        limit,
+                                        self.cols.join(", "),
+                                        &self.from.name
+                                    )
+                                }
+                            },
+                        }
+                    }
+                    None => match self.conditon {
+                        Some(condition) => match self.join {
+                            Some(join) => {
+                                format!(
+                                    "SELECT {} FROM {} JOIN {} WHERE {} FOR JSON PATH;",
+                                    self.cols.join(", "),
+                                    &self.from.name,
+                                    join.build(),
+                                    condition
+                                )
                             }
                             None => {
-                                match self.join {
-                                    Some(join) => {
-                                        format!("SELECT TOP {} {} FROM {} JOIN {} FOR JSON PATH;",limit,self.cols.as_ref(), self.from.as_ref(), join.as_ref())
-                                    }
-                                    None =>{
-                                        format!("SELECT TOP {} {} FROM {}  FOR JSON PATH;",limit,self.cols.as_ref(), self.from.as_ref())
-
-                                    }
-                                }
-
-       
+                                format!(
+                                    "SELECT {} FROM {} WHERE {} FOR JSON PATH;",
+                                    self.cols.join(", "),
+                                    &self.from.name,
+                                    condition
+                                )
                             }
-                        }
-                        
-                    }
-                    None => {
-
-                        match self.conditon {
-                            Some(condition)=>{
-
-                                match self.join {
-                                    Some(join) => {
-                                        format!("SELECT {} FROM {} JOIN {} WHERE {} FOR JSON PATH;",self.cols.as_ref(), self.from.as_ref(), join.as_ref(),condition)
-                                    }
-                                    None =>{
-                                        format!("SELECT {} FROM {} WHERE {} FOR JSON PATH;",self.cols.as_ref(), self.from.as_ref(),condition)
-
-                                    }
-                                }
+                        },
+                        None => match self.join {
+                            Some(join) => {
+                                format!(
+                                    "SELECT {} FROM {} {} FOR JSON PATH;",
+                                    self.cols.join(", "),
+                                    &self.from.name,
+                                    join.build()
+                                )
                             }
                             None => {
-                                match self.join {
-                                    Some(join) => {
-                                        format!("SELECT {} FROM {} JOIN {} FOR JSON PATH;",self.cols.as_ref(), self.from.as_ref(), join.as_ref())
-                                    }
-                                    None =>{
-                                        format!("SELECT {} FROM {}  FOR JSON PATH;",self.cols.as_ref(), self.from.as_ref())
-
-                                    }
-                                }
-
-       
+                                format!(
+                                    "SELECT {} FROM {} FOR JSON PATH;",
+                                    self.cols.join(", "),
+                                    &self.from.name
+                                )
                             }
-                        }
-                        
-
-
-                    }
-
+                        },
+                    },
                 }
-
-                
             }
             _ => {
                 panic!("command not supported")
             }
         }
-
-
     }
 }
-

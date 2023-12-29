@@ -1,41 +1,74 @@
+use crate::objects::{Cols, Table};
 
-use crate::objects::Columns;
-
-use super::Query;
-
-#[derive(Clone)]
-pub struct Join<
-    'a,
-    C: AsRef<str> + Clone,
-    T: AsRef<str> + Clone,
-    J: AsRef<str> + Clone,
-    E: AsRef<str>,
-> {
-    pub query: Query<'a, C, T, J>,
-    pub to_table: E,
+#[derive(Debug, Clone)]
+pub enum JoinState {
+    Complete,
+    Incomplete,
 }
 
-impl<
-        C: AsRef<str> + Clone,
-        T: AsRef<str> + Clone + std::convert::From<std::string::String>,
-        E: AsRef<str> + Clone,
-        J: AsRef<str> + Clone,
-    > Join<'_, C, E, T, J>
-{
-    pub fn on(&mut self, cols: Columns) -> Query<'_, C, E, T> {
-        let left_table = self.query.from.as_ref();
-        let right_table = self.to_table.as_ref();
+#[derive(Debug, Clone)]
+pub struct Join {
+    pub state: JoinState,
+    pub l_tbl: Option<Table>,
+    pub r_tbl: Option<Table>,
+    pub l_col: Option<Cols>,
+    pub r_col: Option<Cols>,
+}
 
-        let on = cols
-            .iter()
-            .map(|f| format!(" {}.{} = {}.{}", left_table, f, right_table, f))
-            .collect::<Vec<String>>()
-            .join(" AND ");
+impl Join {
+    pub fn new(l_tbl: Table, l_col: Cols, r_tbl: Table, r_col: Cols) -> Join {
+        Join {
+            state: JoinState::Complete,
+            l_tbl: Some(l_tbl),
+            r_tbl: Some(r_tbl),
+            l_col: Some(l_col),
+            r_col: Some(r_col),
+        }
+    }
 
-        let join = format!("{} ON {}", right_table, on);
+    pub fn from_right(r_tbl: Table, r_col: Cols) -> Join {
+        Join {
+            state: JoinState::Incomplete,
+            l_tbl: None,
+            r_tbl: Some(r_tbl),
+            l_col: None,
+            r_col: Some(r_col),
+        }
+    }
+    pub fn from_left(l_tbl: Table, l_col: Cols) -> Join {
+        Join {
+            state: JoinState::Incomplete,
+            l_tbl: Some(l_tbl),
+            r_tbl: None,
+            l_col: Some(l_col),
+            r_col: None,
+        }
+    }
 
-        self.query.join = Some(join.into());
+    pub fn build(self) -> String {
+        match self.state {
+            JoinState::Complete => {
+                let l_tbl = self.l_tbl.as_ref().unwrap().name;
+                let r_tbl = self.r_tbl.as_ref().unwrap().name;
 
-        return self.query.clone();
+                let on = self
+                    .l_col
+                    .unwrap()
+                    .iter()
+                    .zip(self.r_col.unwrap())
+                    .enumerate()
+                    .map(|(idx, (l, r))| match idx {
+                        0 => format!("ON {l_tbl}.{l} = {r_tbl}.{r}"),
+                        _ => format!(" AND {l_tbl}.{l} = {r_tbl}.{r}")
+                    } )
+                    .collect::<Vec<_>>()
+                    .join("");
+
+                format!("JOIN {l_tbl} {on}")
+            }
+            JoinState::Incomplete => {
+                panic!("Cannot build an incomplete join.")
+            }
+        }
     }
 }

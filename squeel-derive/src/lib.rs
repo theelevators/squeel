@@ -37,9 +37,9 @@ fn data_types_derive_macro2(
 
         impl #impl_generic Entity for #ident #type_generics #where_clause {
 
-            fn table_column() -> (String,String) {
-                let fields = [#(#fields),*].join(",");
-                (fields,#ident_str.to_string())
+            fn table_column() -> (Vec<&'static str>, &'static str) {
+             
+                ([#(#fields),*].to_vec(),#ident_str)
             }
         }
     ));
