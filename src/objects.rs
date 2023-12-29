@@ -16,6 +16,12 @@ pub struct Columns {
     pub cols: Cols,
 }
 
+
+pub trait Relational {
+    fn find()->Query;
+}
+
+
 pub trait Entity: serde::de::DeserializeOwned {
     fn as_join(cols: Cols) -> Join {
         let (columns, table) = Self::table_column();
